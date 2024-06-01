@@ -103,12 +103,37 @@
   </v-container>
 </template>
 <script>
+const TokenClient = {
+  client: window.google.accounts.oauth2.initTokenClient({
+      auto_select: true,
+      client_id: import.meta.env.VITE_CLIENTID,
+      scope: 'https://www.googleapis.com/auth/youtube',
+      use_fedcm_for_prompt: false,
+      callback: '',
+    }),
+  token: null,
+  expires_at: null,
+  withToken(onSuccess, onError) {
+    if (this.token != null && this.expires_at > Date.now()) {
+      return onSuccess()
+    }
+    this.client.callback = (res) => {
+      if (res.error !== undefined) {
+        return onError(res.error)
+      }
+      this.token = res.access_token
+      this.expires_at = Date.now() + (res.expires_in - 120) * 1000
+      console.log('token set')
+      return onSuccess()
+    }
+    this.client.requestAccessToken()
+  },
+}
 export default {
   data() {
     return {
       searchWords: '',
       googleReady: false,
-      token: null,
       searchResults: [],
       playlists: [],
       selectedPlaylist: null,
@@ -128,7 +153,7 @@ export default {
         part: 'snippet',
         mine: true,
         maxResults: 100,
-        access_token: this.token
+        access_token: TokenClient.token
       }).then((response) => {
         console.log(response.result)
         this.playlists = response.result.items
@@ -139,7 +164,7 @@ export default {
         part: 'snippet',
         myRating: 'like',
         maxResults: 100,
-        access_token: this.token
+        access_token: TokenClient.token
       }).then((response) => {
         console.log(response.result)
         this.likes = response.result.items
@@ -149,9 +174,6 @@ export default {
       window.gapi.client.init({
         'apiKey': import.meta.env.VITE_APIKEY,
         'discoveryDocs': ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
-        // clientId and scope are optional if auth is not required.
-        // 'clientId': 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
-        // 'scope': 'profile',
       }).then(() => {
         this.googleReady = true
         console.log('google ready')
@@ -159,40 +181,30 @@ export default {
         loadLikes()
       })
     }
-    const client = window.google.accounts.oauth2.initTokenClient({
-      auto_select: true,
-      client_id: import.meta.env.VITE_CLIENTID,
-      scope: 'https://www.googleapis.com/auth/youtube',
-      use_fedcm_for_prompt: false,
-      callback: (res) => {
-        console.log(res)
-        if (res && res.access_token) {
-          this.token = res.access_token
-          console.log('token set')
-          window.gapi.load('client', initGoogleClient)
-        }
-      }
+    TokenClient.withToken(() => {
+      window.gapi.load('client', initGoogleClient)
     })
-    client.requestAccessToken()
   },
   methods: {
     doSearch() {
-      window.gapi.client.youtube.search.list({
-        q: this.searchWords,
-        part: 'snippet',
-        maxResults: 80,
-        type: 'video',
-        order: this.sortBy,
-      }).then((response) => {
-        console.log(response.result)
-        this.searchResults = response.result.items
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.search.list({
+          q: this.searchWords,
+          part: 'snippet',
+          maxResults: 80,
+          type: 'video',
+          order: this.sortBy,
+        }).then((response) => {
+          console.log(response.result)
+          this.searchResults = response.result.items
+        })
       })
     },
     getPlaylistItems(playlistId) {
       return window.gapi.client.youtube.playlistItems.list({
         part: 'snippet',
         maxResults: 100,
-        access_token: this.token,
+        access_token: TokenClient.token,
         playlistId: playlistId
       }).then((response) => {
         console.log(response.result)
@@ -200,17 +212,19 @@ export default {
       })
     },
     getVideo(videoId) {
-      window.gapi.client.youtube.videos.list({
-        part: 'player',
-        maxResults: 1,
-        maxHeight: 500,
-        access_token: this.token,
-        id: videoId
-      }).then((response) => {
-        console.log(response.result)
-        this.embedHtml = response.result.items[0].player.embedHtml
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.videos.list({
+          part: 'player',
+          maxResults: 1,
+          maxHeight: 500,
+          access_token: TokenClient.token,
+          id: videoId
+        }).then((response) => {
+          console.log(response.result)
+          this.embedHtml = response.result.items[0].player.embedHtml
+        })
+        this.openVideo = true
       })
-      this.openVideo = true
     }
   },
   watch: {
@@ -219,7 +233,9 @@ export default {
         this.videos = []
       }
       if (newValue != null && newValue != oldValue) {
-        this.videos = await this.getPlaylistItems(this.playlists[newValue].id)
+        TokenClient.withToken(async () => {
+          this.videos = await this.getPlaylistItems(this.playlists[newValue].id)
+        })
       }
     },
     selectedVideo(newValue, oldValue) {
