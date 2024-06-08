@@ -6,18 +6,34 @@
     >
       <v-app-bar :elevation="2">
         <template v-slot:prepend>
-          <v-app-bar-nav-icon></v-app-bar-nav-icon>
+          <v-app-bar-nav-icon id="myChannels">
+          </v-app-bar-nav-icon>
+          <!-- Channels-->
+          <v-menu activator="#myChannels" location="bottom">
+            <v-list>
+              <v-list-item
+                v-for="item in mychannels"
+                :key="item.etag"
+                :prepend-icon="item.icon"
+                :prepend-avatar="item.avator"
+                :title="item.title"
+                :value="item.channelId"
+                :active="channelId === item.channelId"
+                @click="channelId = item.channelId"
+              ></v-list-item>
+            </v-list>
+          </v-menu>
         </template>
-          <v-text-field
-            v-if="googleReady"
-            label="Seach"
-            v-model="searchWords"
-            append-inner-icon="mdi-magnify"
-            @click:append-inner="doSearch"
-            @keydown.enter.prevent="doSearch"
-            hide-details
-            single-line
-          ></v-text-field>
+        <v-text-field
+          v-if="googleReady"
+          label="Seach"
+          v-model="searchWords"
+          append-inner-icon="mdi-magnify"
+          @click:append-inner="doSearch"
+          @keydown.enter.prevent="doSearch"
+          hide-details
+          single-line
+        ></v-text-field>
       </v-app-bar>
 
       <!-- Search Results -->
@@ -143,11 +159,12 @@ export default {
       embedHtml: '',
       likes: [],
       selectedLL: null,
-      sortBy: 'relevance'
+      sortBy: 'relevance',
+      mychannels: [],
+      channelId: null,
     }
   },
   mounted() {
-    console.log('mounted')
     const loadMyPlaylists = () => {
       window.gapi.client.youtube.playlists.list({
         part: 'snippet',
@@ -170,6 +187,28 @@ export default {
         this.likes = response.result.items
       })
     }
+    const loadMyChannels = () => {
+      window.gapi.client.youtube.subscriptions.list({
+        part: 'snippet',
+        mine: true,
+        maxResults: 100,
+        order: 'unread',
+        access_token: TokenClient.token
+      }).then((response) => {
+        console.log(response.result)
+        this.mychannels = [{
+          etag: 'all',
+          icon: "mdi-menu",
+          title: 'すべてのチャンネル',
+          channelId: null,
+        }].concat(response.result.items.map((it) => ({
+          etag: it.etag,
+          avator: it.snippet.thumbnails.default.url,
+          title: it.snippet.title,
+          channelId: it.snippet.resourceId.channelId,
+        })))
+      })
+    }
     const initGoogleClient = () => {
       window.gapi.client.init({
         'apiKey': import.meta.env.VITE_APIKEY,
@@ -179,6 +218,7 @@ export default {
         console.log('google ready')
         loadMyPlaylists()
         loadLikes()
+        loadMyChannels()
       })
     }
     TokenClient.withToken(() => {
@@ -187,17 +227,24 @@ export default {
   },
   methods: {
     doSearch() {
+      const props = {
+        part: 'snippet',
+        maxResults: 80,
+        type: 'video',
+        order: this.sortBy,
+      }
+      if (this.channelId) {
+        props.channelId = this.channelId
+      }
+      if (this.searchWords) {
+        props.q = this.searchWords
+      }
       TokenClient.withToken(() => {
-        window.gapi.client.youtube.search.list({
-          q: this.searchWords,
-          part: 'snippet',
-          maxResults: 80,
-          type: 'video',
-          order: this.sortBy,
-        }).then((response) => {
-          console.log(response.result)
-          this.searchResults = response.result.items
-        })
+        window.gapi.client.youtube.search.list(props)
+          .then((response) => {
+            console.log(response.result)
+            this.searchResults = response.result.items
+          })
       })
     },
     getPlaylistItems(playlistId) {
@@ -257,6 +304,15 @@ export default {
     sortBy(newValue, oldValue) {
       this.doSearch()
     },
+    channelId(newValue, oldValue) {
+      if (newValue !== null) {
+        if (oldValue === null && this.sortBy !== 'date') {
+          this.sortBy = 'date'
+        } else {
+          this.doSearch()
+        }
+      }
+    }
   }
 }
 </script>
