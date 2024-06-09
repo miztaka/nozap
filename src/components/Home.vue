@@ -115,6 +115,8 @@
           </div>
         </v-sheet>
       </v-dialog>
+
+      <div class="text-right">{{ appVersion }}</div>
     </v-responsive>
   </v-container>
 </template>
@@ -162,6 +164,7 @@ export default {
       sortBy: 'relevance',
       mychannels: [],
       channelId: null,
+      appVersion: import.meta.env.VITE_APP_VERSION,
     }
   },
   mounted() {
@@ -263,7 +266,7 @@ export default {
         window.gapi.client.youtube.videos.list({
           part: 'player',
           maxResults: 1,
-          maxWidth: 1000,
+          maxWidth: 960,
           access_token: TokenClient.token,
           id: videoId
         }).then((response) => {
