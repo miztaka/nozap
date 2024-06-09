@@ -263,7 +263,7 @@ export default {
         window.gapi.client.youtube.videos.list({
           part: 'player',
           maxResults: 1,
-          maxHeight: 700,
+          maxHeight: 600,
           access_token: TokenClient.token,
           id: videoId
         }).then((response) => {
