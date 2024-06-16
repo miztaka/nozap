@@ -97,7 +97,10 @@
       ></VideoSlider>
 
       <v-dialog
-        v-model="openVideo">
+        v-model="openVideo"
+        transition="dialog-bottom-transition"
+        fullscreen
+      >
         <v-sheet
           class="align-center justify-center text-center mx-auto"
           elevation="4"
@@ -266,7 +269,8 @@ export default {
         window.gapi.client.youtube.videos.list({
           part: 'player',
           maxResults: 1,
-          maxWidth: 960,
+          maxWidth: window.innerWidth,
+          maxHeight: window.innerHeight,
           access_token: TokenClient.token,
           id: videoId
         }).then((response) => {
