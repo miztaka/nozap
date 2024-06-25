@@ -100,16 +100,28 @@
         v-model="openVideo"
         transition="dialog-bottom-transition"
         fullscreen
+        class="ma-0"
       >
         <v-sheet
-          class="align-center justify-center text-center mx-auto"
+          class="fill-height align-center justify-center text-center mx-auto"
           elevation="4"
         >
           <div v-html="embedHtml"></div>
           <div>
+            <v-select
+              v-model="playlistsToAdd"
+              :items="playlistOptions"
+              label="Add to playlists..."
+              chips
+              multiple
+              flat
+              density="compact"
+              class="d-inline-flex"
+              style="width: 500px"
+            ></v-select>
             <v-btn
-              @click="openVideo = false"
-              class="text-none"
+              @click="closeVideo()"
+              class="d-inline-flex"
               variant="flat"
               width="90"
             >
@@ -160,7 +172,6 @@ export default {
       selectedPlaylist: null,
       selectedVideo: null,
       videos: [],
-      openVideo: false,
       embedHtml: '',
       likes: [],
       selectedLL: null,
@@ -168,6 +179,21 @@ export default {
       mychannels: [],
       channelId: null,
       appVersion: import.meta.env.VITE_APP_VERSION,
+      playlistsToAdd: [],
+      playingVideoId: null,
+    }
+  },
+  computed: {
+    playlistOptions() {
+      return this.playlists.map((item) => {
+        return {
+          title: item.snippet.title,
+          value: item.id,
+        }
+      })
+    },
+    openVideo() {
+      return this.playingVideoId != null
     }
   },
   mounted() {
@@ -245,13 +271,15 @@ export default {
       if (this.searchWords) {
         props.q = this.searchWords
       }
-      TokenClient.withToken(() => {
-        window.gapi.client.youtube.search.list(props)
-          .then((response) => {
-            console.log(response.result)
-            this.searchResults = response.result.items
-          })
-      })
+      if (this.channelId || this.searchWords) {
+        TokenClient.withToken(() => {
+          window.gapi.client.youtube.search.list(props)
+            .then((response) => {
+              console.log(response.result)
+              this.searchResults = response.result.items
+            })
+        })
+      }
     },
     getPlaylistItems(playlistId) {
       return window.gapi.client.youtube.playlistItems.list({
@@ -277,8 +305,63 @@ export default {
           console.log(response.result)
           this.embedHtml = response.result.items[0].player.embedHtml
         })
-        this.openVideo = true
+        this.playingVideoId = videoId
       })
+    },
+    addToPlaylist(videoId, playlistId) {
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.playlistItems.list({
+          part: 'id',
+          maxResults: 100,
+          access_token: TokenClient.token,
+          playlistId: playlistId,
+          videoId: videoId
+        }).then((response) => {
+          if (!response.result.items || response.result.items.length == 0) {
+            window.gapi.client.youtube.playlistItems.insert({
+              part: 'snippet',
+              access_token: TokenClient.token,
+              resource: {
+                snippet: {
+                  playlistId: playlistId,
+                  resourceId: {
+                    kind: 'youtube#video',
+                    videoId: videoId
+                  }
+                }
+              }
+            }).then((response) => {
+              console.log(response.result)
+            })
+          }
+        })      
+      })
+    },
+    delFromPlaylist(videoId, playlistId) {
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.playlistItems.list({
+          part: 'id',
+          maxResults: 100,
+          access_token: TokenClient.token,
+          playlistId: playlistId,
+          videoId: videoId
+        }).then((response) => {
+          if (response.result.items) {
+            response.result.items.forEach((item) => {
+              window.gapi.client.youtube.playlistItems.delete({
+                access_token: TokenClient.token,
+                id: item.id
+              }).then((response) => {
+                console.log(response.result)
+              })
+            })
+          }
+        })
+      })
+    },
+    closeVideo() {
+      this.playingVideoId = null
+      this.playlistsToAdd = []
     }
   },
   watch: {
@@ -294,7 +377,7 @@ export default {
     },
     selectedVideo(newValue, oldValue) {
       if (newValue == null) {
-        this.openVideo = false
+        this.closeVideo()
       }
       if (newValue != null && newValue != oldValue) {
         this.getVideo(this.videos[newValue].snippet.resourceId.videoId)
@@ -302,7 +385,7 @@ export default {
     },
     selectedLL(newValue, oldValue) {
       if (newValue == null) {
-        this.openVideo = false
+        this.closeVideo()
       }
       if (newValue != null && newValue != oldValue) {
         this.getVideo(this.likes[newValue].id)
@@ -318,6 +401,16 @@ export default {
         } else {
           this.doSearch()
         }
+      }
+    },
+    playlistsToAdd(newValue, oldValue) {
+      if (this.playingVideoId) {
+        newValue.filter(n => oldValue.indexOf(n) === -1).forEach(n => {
+          this.addToPlaylist(this.playingVideoId, n)
+        })
+        oldValue.filter(n => newValue.indexOf(n) === -1).forEach(n => {
+          this.delFromPlaylist(this.playingVideoId, n)
+        })
       }
     }
   }
