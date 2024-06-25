@@ -107,27 +107,30 @@
           elevation="4"
         >
           <div v-html="embedHtml"></div>
-          <div>
-            <v-select
-              v-model="playlistsToAdd"
-              :items="playlistOptions"
-              label="Add to playlists..."
-              chips
-              multiple
-              flat
-              density="compact"
-              class="d-inline-flex"
-              style="width: 500px"
-            ></v-select>
-            <v-btn
-              @click="closeVideo()"
-              class="d-inline-flex"
-              variant="flat"
-              width="90"
-            >
-              Close
-            </v-btn>
-          </div>
+          <v-row class="no-gutters justify-center ma-0">
+            <v-col cols="2">
+              <v-select
+                v-model="playlistsToAdd"
+                :items="playlistOptions"
+                label="Add to playlists..."
+                no-data-text="No playlists found"
+                chips
+                multiple
+                flat
+                density="compact"
+              ></v-select>
+            </v-col>
+            <v-col cols="2">
+              <v-btn
+                @click="closeVideo()"
+                class="d-inline-flex"
+                variant="flat"
+                width="90"
+              >
+                Close
+              </v-btn>
+            </v-col>
+          </v-row>
         </v-sheet>
       </v-dialog>
 
