@@ -224,7 +224,7 @@ export default {
     }
     const loadMyChannels = () => {
       window.gapi.client.youtube.subscriptions.list({
-        part: 'snippet',
+        part: 'snippet,contentDetails',
         mine: true,
         maxResults: 100,
         order: 'unread',
@@ -239,7 +239,7 @@ export default {
         }].concat(response.result.items.map((it) => ({
           etag: it.etag,
           avator: it.snippet.thumbnails.default.url,
-          title: it.snippet.title,
+          title: it.snippet.title + ' (' + it.contentDetails.newItemCount + ')',
           channelId: it.snippet.resourceId.channelId,
         })))
       })
@@ -292,7 +292,7 @@ export default {
         playlistId: playlistId
       }).then((response) => {
         console.log(response.result)
-        return response.result.items
+        return response.result.items.sort((a, b) => a.snippet.publishedAt > b.snippet.publishedAt ? -1 : 1)
       })
     },
     getVideo(videoId) {
@@ -365,6 +365,8 @@ export default {
     closeVideo() {
       this.playingVideoId = null
       this.playlistsToAdd = []
+      this.selectedVideo = null
+      this.selectedLL = null
     }
   },
   watch: {
@@ -379,17 +381,11 @@ export default {
       }
     },
     selectedVideo(newValue, oldValue) {
-      if (newValue == null) {
-        this.closeVideo()
-      }
       if (newValue != null && newValue != oldValue) {
         this.getVideo(this.videos[newValue].snippet.resourceId.videoId)
       }
     },
     selectedLL(newValue, oldValue) {
-      if (newValue == null) {
-        this.closeVideo()
-      }
       if (newValue != null && newValue != oldValue) {
         this.getVideo(this.likes[newValue].id)
       }
