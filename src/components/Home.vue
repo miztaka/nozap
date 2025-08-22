@@ -70,7 +70,42 @@
         </div>
       </v-sheet>
 
-      <h3 v-if="playlists.length > 0">Playlists</h3>
+      <div class="d-flex align-center mb-2">
+        <h3 class="mr-4">Playlists</h3>
+        <v-btn
+          color="primary"
+          variant="flat"
+          @click="showCreatePlaylist = true"
+          size="small"
+        >
+          Add
+        </v-btn>
+      </div>
+      <v-dialog v-model="showCreatePlaylist" max-width="400">
+        <v-card>
+          <v-card-title>Create New Playlist</v-card-title>
+          <v-card-text>
+            <v-text-field
+              v-model="newPlaylistName"
+              label="Playlist Name"
+              autofocus
+              required
+            ></v-text-field>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn
+              text
+              @click="showCreatePlaylist = false"
+            >Cancel</v-btn>
+            <v-btn
+              color="primary"
+              @click="createPlaylist"
+              :disabled="!newPlaylistName"
+            >Create</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
       <VideoSlider
         v-if="playlists.length > 0"
         v-model="selectedPlaylist"
@@ -184,6 +219,8 @@ export default {
       appVersion: import.meta.env.VITE_APP_VERSION,
       playlistsToAdd: [],
       playingVideoId: null,
+      showCreatePlaylist: false,
+      newPlaylistName: '',
     }
   },
   computed: {
@@ -359,6 +396,25 @@ export default {
               })
             })
           }
+        })
+      })
+    },
+    createPlaylist() {
+      if (!this.newPlaylistName) return
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.playlists.insert({
+          part: 'snippet',
+          access_token: TokenClient.token,
+          resource: {
+            snippet: {
+              title: this.newPlaylistName,
+            },
+          }
+        }).then((response) => {
+          console.log(response.result)
+          this.playlists.push(response.result)
+          this.showCreatePlaylist = false
+          this.newPlaylistName = ''
         })
       })
     },
