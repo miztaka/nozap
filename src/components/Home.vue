@@ -41,10 +41,11 @@
           v-if="searchResults.length > 0"
           class="align-center justify-center text-center mx-auto mb-16"
       >
-        <v-row class="align-center mb-2">
+        <v-row class="align-center ma-1">
           <v-col cols="auto">
-            <h3 class="mr-4 mb-0">Search Results</h3>
+            <h3 class="mr-4 mb-0">Search results {{ selectedChannelName ? 'in ' + selectedChannelName : '' }}</h3>
           </v-col>
+          <v-col cols="auto">sorted by</v-col>
           <v-col cols="auto">
             <v-select
               class="d-inline-block"
@@ -54,15 +55,15 @@
               style="min-width: 120px;"
             ></v-select>
           </v-col>
-          <v-col cols="auto">
-            <v-btn
-              @click="searchResults = []"
-              class="text-none"
-              variant="flat"
-              width="90"
-            >
-              Close
-            </v-btn>
+          <v-spacer></v-spacer>
+          <v-col cols="auto" class="d-flex justify-end align-center">
+          <v-btn
+            @click="searchResults = []"
+            class="text-none"
+            variant="flat"
+          >
+            Close
+          </v-btn>
           </v-col>
         </v-row>
         <v-row>
@@ -259,6 +260,12 @@ export default {
     },
     openVideo() {
       return this.playingVideo != null
+    },
+    selectedChannelName() {
+      if (!this.channelId) {
+        return null
+      }
+      return this.mychannels.find((ch) => ch.channelId === this.channelId)?.title || null
     }
   },
   mounted() {
