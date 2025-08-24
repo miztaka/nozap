@@ -41,14 +41,30 @@
           v-if="searchResults.length > 0"
           class="align-center justify-center text-center mx-auto mb-16"
       >
-        <h6>
-          <v-select
-            class="d-inline-block"
-            v-model="sortBy"
-            :items="['relevance', 'date', 'rating', 'viewCount']"
-            variant="underlined"
-          ></v-select>
-        </h6>
+        <v-row class="align-center mb-2">
+          <v-col cols="auto">
+            <h3 class="mr-4 mb-0">Search Results</h3>
+          </v-col>
+          <v-col cols="auto">
+            <v-select
+              class="d-inline-block"
+              v-model="sortBy"
+              :items="['relevance', 'date', 'rating', 'viewCount']"
+              variant="underlined"
+              style="min-width: 120px;"
+            ></v-select>
+          </v-col>
+          <v-col cols="auto">
+            <v-btn
+              @click="searchResults = []"
+              class="text-none"
+              variant="flat"
+              width="90"
+            >
+              Close
+            </v-btn>
+          </v-col>
+        </v-row>
         <v-row>
           <v-col v-for="item in searchResults" :key="item.etag">
             <VideoCard
@@ -78,7 +94,7 @@
           @click="showCreatePlaylist = true"
           size="small"
         >
-          Add
+          New..
         </v-btn>
       </div>
       <v-dialog v-model="showCreatePlaylist" max-width="400">
@@ -138,10 +154,11 @@
         class="ma-0"
       >
         <v-sheet
+          v-if="playingVideo != null"
           class="fill-height align-center justify-center text-center mx-auto"
           elevation="4"
         >
-          <div v-html="embedHtml"></div>
+          <div v-html="playingVideo.player.embedHtml"></div>
           <v-row class="no-gutters justify-center ma-0">
             <v-col cols="2">
               <v-select
@@ -154,6 +171,15 @@
                 flat
                 density="compact"
               ></v-select>
+            </v-col>
+            <v-col cols="2">
+              <v-btn
+                variant="flat"
+                width="90"
+                @click="subscribeToChannel"
+              >
+                Subscribe
+              </v-btn>
             </v-col>
             <v-col cols="2">
               <v-btn
@@ -210,7 +236,6 @@ export default {
       selectedPlaylist: null,
       selectedVideo: null,
       videos: [],
-      embedHtml: '',
       likes: [],
       selectedLL: null,
       sortBy: 'relevance',
@@ -218,7 +243,7 @@ export default {
       channelId: null,
       appVersion: import.meta.env.VITE_APP_VERSION,
       playlistsToAdd: [],
-      playingVideoId: null,
+      playingVideo: null,
       showCreatePlaylist: false,
       newPlaylistName: '',
     }
@@ -233,7 +258,7 @@ export default {
       })
     },
     openVideo() {
-      return this.playingVideoId != null
+      return this.playingVideo != null
     }
   },
   mounted() {
@@ -273,12 +298,7 @@ export default {
           icon: "mdi-menu",
           title: 'すべてのチャンネル',
           channelId: null,
-        }].concat(response.result.items.map((it) => ({
-          etag: it.etag,
-          avator: it.snippet.thumbnails.default.url,
-          title: it.snippet.title + ' (' + it.contentDetails.newItemCount + ')',
-          channelId: it.snippet.resourceId.channelId,
-        })))
+        }].concat(response.result.items.map((it) => this.myChannelItem(it)))
       })
     }
     const initGoogleClient = () => {
@@ -298,6 +318,14 @@ export default {
     })
   },
   methods: {
+    myChannelItem(it) {
+      return {
+        etag: it.etag,
+        avator: it.snippet.thumbnails.default.url,
+        title: it.snippet.title + ' (' + it.contentDetails.newItemCount + ')',
+        channelId: it.snippet.resourceId.channelId,
+      }
+    },
     doSearch() {
       const props = {
         part: 'snippet',
@@ -335,7 +363,7 @@ export default {
     getVideo(videoId) {
       TokenClient.withToken(() => {
         window.gapi.client.youtube.videos.list({
-          part: 'player',
+          part: 'id,player,snippet',
           maxResults: 1,
           maxWidth: window.innerWidth,
           maxHeight: window.innerHeight,
@@ -343,9 +371,8 @@ export default {
           id: videoId
         }).then((response) => {
           console.log(response.result)
-          this.embedHtml = response.result.items[0].player.embedHtml
+          this.playingVideo = response.result.items[0]
         })
-        this.playingVideoId = videoId
       })
     },
     addToPlaylist(videoId, playlistId) {
@@ -412,14 +439,35 @@ export default {
           }
         }).then((response) => {
           console.log(response.result)
-          this.playlists.push(response.result)
+          this.playlists.unshift(response.result)
           this.showCreatePlaylist = false
           this.newPlaylistName = ''
         })
       })
     },
+    subscribeToChannel() {
+      if (!this.playingVideo) return
+      const channelId = this.playingVideo.snippet.channelId
+      TokenClient.withToken(() => {
+        window.gapi.client.youtube.subscriptions.insert({
+          part: 'snippet,contentDetails',
+          access_token: TokenClient.token,
+          resource: {
+            snippet: {
+              resourceId: {
+                kind: 'youtube#channel',
+                channelId: channelId
+              }
+            }
+          }
+        }).then((response) => {
+          console.log(response.result)
+          this.mychannels.push(this.myChannelItem(response.result))
+        })
+      })
+    },
     closeVideo() {
-      this.playingVideoId = null
+      this.playingVideo = null
       this.playlistsToAdd = []
       this.selectedVideo = null
       this.selectedLL = null
@@ -459,12 +507,12 @@ export default {
       }
     },
     playlistsToAdd(newValue, oldValue) {
-      if (this.playingVideoId) {
+      if (this.playingVideo) {
         newValue.filter(n => oldValue.indexOf(n) === -1).forEach(n => {
-          this.addToPlaylist(this.playingVideoId, n)
+          this.addToPlaylist(this.playingVideo.id, n)
         })
         oldValue.filter(n => newValue.indexOf(n) === -1).forEach(n => {
-          this.delFromPlaylist(this.playingVideoId, n)
+          this.delFromPlaylist(this.playingVideo.id, n)
         })
       }
     }
