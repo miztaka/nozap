@@ -28,11 +28,14 @@
           v-if="googleReady"
           label="Seach"
           v-model="searchWords"
+          placeholder="Search words or URL..."
           append-inner-icon="mdi-magnify"
           @click:append-inner="doSearch"
           @keydown.enter.prevent="doSearch"
           hide-details
           single-line
+          clearable
+          @click:clear="searchWords = ''"
         ></v-text-field>
       </v-app-bar>
 
@@ -340,11 +343,18 @@ export default {
         type: 'video',
         order: this.sortBy,
       }
+      if (this.searchWords) {
+        if (this.searchWords.startsWith('https://')) {
+          const videoId = this.extractYouTubeId(this.searchWords)
+          if (videoId) {
+            this.getVideo(videoId)
+          }
+          return
+        }
+        props.q = this.searchWords
+      }
       if (this.channelId) {
         props.channelId = this.channelId
-      }
-      if (this.searchWords) {
-        props.q = this.searchWords
       }
       if (this.channelId || this.searchWords) {
         TokenClient.withToken(() => {
@@ -478,6 +488,49 @@ export default {
       this.playlistsToAdd = []
       this.selectedVideo = null
       this.selectedLL = null
+    },
+    extractYouTubeId(url) {
+      try {
+        const parsed = new URL(url);
+
+        // host check
+        const host = parsed.hostname.toLowerCase();
+        if (
+          !host.includes("youtube.com") &&
+          !host.includes("youtu.be")
+        ) {
+          return null; // not YouTube
+        }
+
+        // 1. Standard watch URL: ?v=VIDEO_ID
+        if (parsed.searchParams.has("v")) {
+          return parsed.searchParams.get("v");
+        }
+
+        // 2. Short youtu.be/VIDEO_ID
+        if (host === "youtu.be") {
+          return parsed.pathname.slice(1).split("/")[0];
+        }
+
+        // 3. /embed/VIDEO_ID
+        if (parsed.pathname.startsWith("/embed/")) {
+          return parsed.pathname.split("/")[2];
+        }
+
+        // 4. /shorts/VIDEO_ID
+        if (parsed.pathname.startsWith("/shorts/")) {
+          return parsed.pathname.split("/")[2];
+        }
+
+        // 5. /v/VIDEO_ID (old style)
+        if (parsed.pathname.startsWith("/v/")) {
+          return parsed.pathname.split("/")[2];
+        }
+
+        return null;
+      } catch {
+        return null; // invalid URL
+      }
     }
   },
   watch: {
