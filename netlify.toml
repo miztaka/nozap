@@ -1,0 +1,7 @@
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[dev]
+  targetPort = 3333
+  port = 3000

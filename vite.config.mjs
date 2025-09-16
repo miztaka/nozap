@@ -84,9 +84,9 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 3000,
+    port: 3333,
   },
   preview: {
-    port: 3000,
+    port: 3333,
   }
 })

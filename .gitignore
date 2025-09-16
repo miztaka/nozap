@@ -25,3 +25,6 @@ pnpm-debug.log*
 .editorconfig
 .eslintrc.js
 
+
+# Local Netlify folder
+.netlify

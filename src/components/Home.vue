@@ -342,6 +342,7 @@ export default {
         maxResults: 80,
         type: 'video',
         order: this.sortBy,
+        safeSearch: 'strict',
       }
       if (this.searchWords) {
         if (this.searchWords.startsWith('https://')) {
@@ -389,7 +390,22 @@ export default {
         }).then((response) => {
           console.log(response.result)
           this.playingVideo = response.result.items[0]
+          // TODO call logging
+          this.writeVideoLog()
         })
+      })
+    },
+    writeVideoLog() {
+      // TODO implement logging
+      fetch("/.netlify/functions/videoLog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: this.playingVideo.id,
+          title: this.playingVideo.snippet.title,
+        }),
+      }).then((res) => {
+        console.log(res)
       })
     },
     addToPlaylist(videoId, playlistId) {
